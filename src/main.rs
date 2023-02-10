@@ -1,13 +1,17 @@
 use std::collections::{HashSet, VecDeque};
 
+use clap::Parser;
 use lazy_static::lazy_static;
 use reqwest;
 use scraper::{Html, Selector};
 
-const DOMAIN: &str = "sophiabits.com";
-
 lazy_static! {
     static ref ANCHOR: Selector = make_selector("a");
+}
+
+#[derive(Parser)]
+struct Cli {
+    domain: String,
 }
 
 fn get_url(url: &String) -> reqwest::Result<String> {
@@ -15,8 +19,8 @@ fn get_url(url: &String) -> reqwest::Result<String> {
     res.text()
 }
 
-fn is_url_external(url: &String) -> bool {
-    !url.starts_with(&format!("https://{}", DOMAIN))
+fn is_url_external(cli: &Cli, url: &String) -> bool {
+    !url.starts_with(&format!("https://{}", cli.domain))
 }
 
 fn is_url_scrapeable(url: &String) -> bool {
@@ -27,15 +31,16 @@ fn make_selector(selector: &str) -> Selector {
     Selector::parse(selector).unwrap()
 }
 
-fn normalize_url(url: String) -> String {
+fn normalize_url(cli: &Cli, url: &String) -> String {
     if url.starts_with("/") {
-        return format!("https://{}{}", DOMAIN, url);
+        return format!("https://{}{}", cli.domain, url);
     }
 
     url.clone()
 }
 
 fn main() {
+    let cli = &Cli::parse();
     let mut errors = Vec::new();
 
     let mut queue = VecDeque::new();
@@ -45,7 +50,7 @@ fn main() {
 
     while let Some(url) = queue.pop_front() {
         visited.insert(url.clone());
-        let url = normalize_url(url);
+        let url = normalize_url(&cli, &url);
 
         let res = match get_url(&url) {
             Ok(r) => r,
@@ -55,7 +60,7 @@ fn main() {
             }
         };
 
-        if is_url_external(&url) {
+        if is_url_external(&cli, &url) {
             // Only check 1 level deep externally
             continue;
         }
